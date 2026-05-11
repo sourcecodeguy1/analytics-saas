@@ -25,7 +25,7 @@ jobs:
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_TOKEN }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
 
       - name: Build & Push Analytics API (Laravel)
         uses: docker/build-push-action@v5
@@ -33,8 +33,8 @@ jobs:
           context: ./server
           push: true
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ secrets.SERVER_IMAGE }}:${{ env.APP_VERSION }}
-            ${{ secrets.DOCKER_USERNAME }}/${{ secrets.SERVER_IMAGE }}:latest
+            ${{ secrets.DOCKER_USERNAME }}/analytics-api:${{ env.APP_VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/analytics-api:latest
 
       - name: Build & Push Analytics Client (React)
         uses: docker/build-push-action@v5
@@ -42,10 +42,10 @@ jobs:
           context: ./client
           push: true
           build-args: |
-            VITE_API_URL=${{ secrets.VITE_API_URL }}
+            VITE_API_URL=https://analytics-api.juliowebmaster.com/api
           tags: |
-            ${{ secrets.DOCKER_USERNAME }}/${{ secrets.CLIENT_IMAGE }}:${{ env.APP_VERSION }}
-            ${{ secrets.DOCKER_USERNAME }}/${{ secrets.CLIENT_IMAGE }}:latest
+            ${{ secrets.DOCKER_USERNAME }}/analytics-client:${{ env.APP_VERSION }}
+            ${{ secrets.DOCKER_USERNAME }}/analytics-client:latest
 
   deploy:
     name: Deploy to Vultr
@@ -59,19 +59,19 @@ jobs:
       - name: Set up SSH Connection
         uses: webfactory/ssh-agent@v0.9.0
         with:
-          ssh-private-key: ${{ secrets.VULTR_SSH_PRIVATE_KEY }}
+          ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
 
       - name: Compute APP_VERSION for deploy
         run: echo "APP_VERSION=$(date +'%Y.%m.%d')-${GITHUB_SHA::7}" >> $GITHUB_ENV
 
       - name: Deploy Analytics Client
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VULTR_USER }}@${{ secrets.VULTR_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'EOF'
             set -e
             cd ${{ secrets.SERVER_DIRECTORY }}
             export ANALYTICS_CLIENT_TAG='${{ env.APP_VERSION }}'
             echo "Pulling Analytics Client image..."
-            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.CLIENT_IMAGE }}:${ANALYTICS_CLIENT_TAG}
+            docker pull ${{ secrets.DOCKER_USERNAME }}/analytics-client:${ANALYTICS_CLIENT_TAG}
             echo "Removing any stale containers..."
             docker rm -f analytics_client_container 2>/dev/null || true
             echo "Restarting Analytics Client..."
@@ -80,12 +80,12 @@ jobs:
 
       - name: Deploy Analytics API
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VULTR_USER }}@${{ secrets.VULTR_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} << 'EOF'
             set -e
             cd ${{ secrets.SERVER_DIRECTORY }}
             export ANALYTICS_API_TAG='${{ env.APP_VERSION }}'
             echo "Pulling Analytics API image..."
-            docker pull ${{ secrets.DOCKER_USERNAME }}/${{ secrets.SERVER_IMAGE }}:${ANALYTICS_API_TAG}
+            docker pull ${{ secrets.DOCKER_USERNAME }}/analytics-api:${ANALYTICS_API_TAG}
             echo "Removing any stale containers..."
             docker rm -f analytics_api_container 2>/dev/null || true
             echo "Restarting Analytics API..."
@@ -100,7 +100,7 @@ jobs:
 
       - name: Cleanup old images
         run: |
-          ssh -o StrictHostKeyChecking=no ${{ secrets.VULTR_USER }}@${{ secrets.VULTR_HOST }} "docker image prune -f"
+          ssh -o StrictHostKeyChecking=no ${{ secrets.SSH_USERNAME }}@${{ secrets.SSH_HOST }} "docker image prune -f"
 
       - name: Deployment Summary
         run: |
