@@ -35,10 +35,15 @@ COPY . .
 # Run post-install scripts after full copy
 RUN composer run-script post-autoload-dump || true
 
+# Ensure SQLite database file exists and is writable
+RUN touch /var/www/html/database/database.sqlite
+
 # Set permissions
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 755 /var/www/html/storage \
-    && chmod -R 755 /var/www/html/bootstrap/cache
+    && chmod -R 755 /var/www/html/bootstrap/cache \
+    && chmod -R 775 /var/www/html/database \
+    && chmod 664 /var/www/html/database/database.sqlite
 
 # Copy nginx and supervisor configs
 COPY docker/nginx.conf /etc/nginx/http.d/default.conf
