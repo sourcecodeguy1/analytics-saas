@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
+use Stripe\Exception\SignatureVerificationException;
 use Stripe\Stripe;
 use Stripe\Webhook;
 
@@ -21,14 +22,16 @@ class WebhookController extends Controller
 
         try {
             $event = Webhook::constructEvent($payload, $sigHeader, $secret);
-        } catch (\Exception $e) {
-            return response($e->getMessage(), 400);
+        } catch (SignatureVerificationException $e) {
+            return response('Invalid signature', 400);
         }
 
+        $data = $event->data->object;
+
         match ($event->type) {
-            'checkout.session.completed' => $this->handleCheckoutCompleted($event->data->object),
-            'customer.subscription.deleted' => $this->handleSubscriptionDeleted($event->data->object),
-            'customer.subscription.updated' => $this->handleSubscriptionUpdated($event->data->object),
+            'checkout.session.completed' => $this->handleCheckoutCompleted($data),
+            'customer.subscription.updated' => $this->handleSubscriptionUpdated($data),
+            'customer.subscription.deleted' => $this->handleSubscriptionDeleted($data),
             default => null,
         };
 
@@ -37,16 +40,16 @@ class WebhookController extends Controller
 
     private function handleCheckoutCompleted(object $session): void
     {
-        $user = User::find($session->metadata->user_id);
+        $user = User::where('stripe_customer_id', $session->customer)->first();
 
         if (!$user) {
             return;
         }
 
         $user->update([
-            'stripe_subscription_id' => $session->subscription,
-            'subscription_plan' => $session->metadata->plan,
             'subscription_status' => 'active',
+            'subscription_plan' => $session->metadata->plan ?? 'monthly',
+            'stripe_subscription_id' => $session->subscription,
         ]);
     }
 
@@ -58,9 +61,15 @@ class WebhookController extends Controller
             return;
         }
 
+        $endsAt = $subscription->current_period_end
+            ? now()->setTimestamp($subscription->current_period_end)
+            : null;
+
         $user->update([
-            'subscription_status' => 'canceled',
-            'subscription_ends_at' => now()->timestamp($subscription->current_period_end),
+            'subscription_status' => 'free',
+            'subscription_plan' => null,
+            'stripe_subscription_id' => null,
+            'subscription_ends_at' => $endsAt,
         ]);
     }
 
@@ -72,9 +81,16 @@ class WebhookController extends Controller
             return;
         }
 
-        $activeStatuses = ['active', 'trialing'];
-        $status = in_array($subscription->status, $activeStatuses) ? 'active' : 'canceled';
+        $status = match ($subscription->status) {
+            'active', 'trialing' => 'active',
+            'past_due', 'unpaid' => 'past_due',
+            'canceled' => 'free',
+            default => 'free',
+        };
 
-        $user->update(['subscription_status' => $status]);
+        $user->update([
+            'subscription_status' => $status,
+            'subscription_plan' => $status === 'active' ? ($user->subscription_plan ?? 'monthly') : null,
+        ]);
     }
 }
