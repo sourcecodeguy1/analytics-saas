@@ -101,7 +101,7 @@ export default function DashboardPage() {
           <div className="flex items-center gap-3">
             {isPro && <Badge className="bg-indigo-600 text-white"><Crown className="h-3 w-3 mr-1" />Pro</Badge>}
             <span className="text-sm text-gray-600">{user?.name}</span>
-            {isPro && (
+            {isPro && !canceledAt && (
               <Button
                 variant="ghost"
                 size="sm"
