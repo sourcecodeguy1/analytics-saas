@@ -73,7 +73,7 @@ jobs:
             echo "Pulling Analytics Client image..."
             docker pull ${{ secrets.DOCKER_USERNAME }}/analytics-client:${ANALYTICS_CLIENT_TAG}
             echo "Removing any stale containers..."
-            docker rm -f analytics_client_container 2>/dev/null || true
+            docker rm -f analytics-client 2>/dev/null || true
             echo "Restarting Analytics Client..."
             ANALYTICS_CLIENT_TAG=${ANALYTICS_CLIENT_TAG} docker compose up -d --force-recreate analytics-client
           EOF
@@ -87,15 +87,15 @@ jobs:
             echo "Pulling Analytics API image..."
             docker pull ${{ secrets.DOCKER_USERNAME }}/analytics-api:${ANALYTICS_API_TAG}
             echo "Removing any stale containers..."
-            docker rm -f analytics_api_container 2>/dev/null || true
+            docker rm -f analytics-api 2>/dev/null || true
             echo "Restarting Analytics API..."
             ANALYTICS_API_TAG=${ANALYTICS_API_TAG} docker compose up -d --force-recreate analytics-api
             echo "Waiting for API container to be ready..."
             sleep 10
             echo "Running database migrations..."
-            docker exec analytics_api_container php artisan migrate --force
+            docker exec analytics-api php artisan migrate --force
             echo "Running database seeders..."
-            docker exec analytics_api_container php artisan db:seed --class=DemoUserSeeder --force
+            docker exec analytics-api php artisan db:seed --class=DemoUserSeeder --force
           EOF
 
       - name: Cleanup old images
