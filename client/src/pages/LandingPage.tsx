@@ -111,7 +111,7 @@ export default function LandingPage() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {plans.map((plan) => (
-              <Card key={plan.name} className={`relative ${plan.highlight ? 'border-indigo-500 border-2 shadow-lg' : 'border-gray-200'}`}>
+              <Card key={plan.name} className={`relative !overflow-visible ${plan.highlight ? 'border-indigo-500 border-2 shadow-lg' : 'border-gray-200'}`}>
                 {plan.badge && (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                     <Badge className="bg-indigo-600 text-white">{plan.badge}</Badge>
