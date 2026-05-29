@@ -81,16 +81,21 @@ class WebhookController extends Controller
             return;
         }
 
-        $status = match ($subscription->status) {
-            'active', 'trialing' => 'active',
-            'past_due', 'unpaid' => 'past_due',
-            'canceled' => 'free',
-            default => 'free',
-        };
+        $status = $this->mapStripeStatus($subscription->status);
 
         $user->update([
             'subscription_status' => $status,
             'subscription_plan' => $status === 'active' ? ($user->subscription_plan ?? 'monthly') : null,
         ]);
+    }
+
+    public function mapStripeStatus(string $status): string
+    {
+        return match ($status) {
+            'active', 'trialing' => 'active',
+            'past_due', 'unpaid' => 'past_due',
+            'canceled' => 'free',
+            default => 'free',
+        };
     }
 }
