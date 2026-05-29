@@ -7,8 +7,38 @@ on:
   workflow_dispatch:
 
 jobs:
+  test:
+    name: Run PHPUnit Tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, xml, ctype, json, pdo, pdo_sqlite
+          coverage: none
+
+      - name: Install Dependencies
+        working-directory: ./server
+        run: composer install --no-interaction --prefer-dist --optimize-autoloader
+
+      - name: Setup Environment
+        working-directory: ./server
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Run PHPUnit Tests
+        working-directory: ./server
+        run: ./vendor/bin/phpunit --testsuite Unit
+
   build-and-push:
     name: Build & Push Docker Images
+    needs: test
     runs-on: ubuntu-latest
 
     steps:
